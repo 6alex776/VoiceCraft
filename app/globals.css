@@ -219,6 +219,8 @@ button {
   flex: 1;
   justify-content: center;
   min-height: 0;
+  position: relative;
+  z-index: 1; /* 确保在雾气层之上 */
 }
 
 .orb-wrap {
@@ -301,7 +303,7 @@ button {
              orbIdleMist 12s ease-in-out infinite;
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1;
-  overflow: visible; /* 允许雾气斑块飘出球面边界 */
+  overflow: hidden; /* 雾气斑块限制在球面内 */
 }
 
 /* 水彩纹理层 — 改为内部雾气斑块元素驱动，不再依赖伪元素 */
@@ -533,6 +535,290 @@ button {
 
 .status-text.active {
   color: var(--text-secondary);
+}
+
+/* =============================================
+   全屏雾气层 — fixed 定位覆盖整个页面
+   始终存在于界面内，随状态变化强度
+   覆盖顶栏、主舞台、底栏全部区域
+   ============================================= */
+
+.thinking-fog {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 1; /* 始终完全可见 */
+}
+
+/* ====== 径向扩散光晕 — 始终覆盖界面，状态决定强度 ====== */
+
+.fog-radial {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 140vw;
+  height: 140vh;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background:
+    radial-gradient(
+      circle,
+      rgba(170, 215, 255, 0.08) 0%,
+      rgba(130, 195, 245, 0.04) 35%,
+      rgba(80, 150, 230, 0.015) 60%,
+      transparent 75%
+    );
+  transition: background 1s ease, filter 1s ease, opacity 1s ease;
+}
+
+/* idle — 可见的背景雾 */
+
+.thinking-fog.idle .fog-radial {
+  background:
+    radial-gradient(
+      circle,
+      rgba(180, 225, 255, 0.18) 0%,
+      rgba(145, 200, 250, 0.10) 32%,
+      rgba(100, 165, 240, 0.04) 55%,
+      transparent 72%
+    );
+  opacity: 1;
+}
+
+/* listening — 轻微增强，随声音脉动 */
+
+.thinking-fog.listening .fog-radial {
+  background:
+    radial-gradient(
+      circle,
+      rgba(165, 210, 255, 0.12) 0%,
+      rgba(125, 185, 245, 0.055) 32%,
+      rgba(70, 145, 225, 0.02) 58%,
+      transparent 72%
+    );
+  opacity: 0.75;
+  animation: fogPulse 2s ease-in-out infinite;
+}
+
+@keyframes fogPulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.04); }
+}
+
+/* thinking — 雾气完全铺开，最浓郁 */
+
+.thinking-fog.thinking .fog-radial {
+  background:
+    radial-gradient(
+      circle,
+      rgba(160, 208, 255, 0.16) 0%,
+      rgba(120, 182, 242, 0.08) 30%,
+      rgba(65, 138, 220, 0.03) 55%,
+      transparent 72%
+    );
+  opacity: 1;
+  animation: none;
+}
+
+/* speaking — 雾气流动呼吸 */
+
+.thinking-fog.speaking .fog-radial {
+  background:
+    radial-gradient(
+      circle,
+      rgba(155, 205, 255, 0.14) 0%,
+      rgba(115, 178, 240, 0.07) 32%,
+      rgba(60, 132, 218, 0.025) 56%,
+      transparent 72%
+    );
+  opacity: 0.92;
+  animation: fogBreathe 3.5s ease-in-out infinite;
+}
+
+@keyframes fogBreathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.03); opacity: 0.85; }
+}
+
+/* interrupted — 快速收缩 */
+
+.thinking-fog.interrupted .fog-radial {
+  transition: all 0.6s ease;
+  opacity: 0.4;
+  transform: translate(-50%, -50%) scale(0.96);
+}
+
+/* ====== 界面级漂浮雾气斑块（始终显示） ====== */
+
+.fmist {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity, filter;
+  opacity: 0.55; /* 默认可见 */
+  transition: opacity 1s ease;
+}
+
+/* idle — 斑块清晰可见，缓慢飘动 */
+
+.thinking-fog.idle .fmist {
+  opacity: 0.5;
+  animation-duration: 20s !important; /* 缓慢飘动 */
+}
+
+/* listening — 斑块稍明显 */
+
+.thinking-fog.listening .fmist {
+  opacity: 0.4;
+  animation-duration: 22s !important;
+}
+
+/* thinking — 斑块完全展现，大范围飘动 */
+
+.thinking-fog.thinking .fmist {
+  opacity: 0.85;
+  animation-duration: 18s !important;
+}
+
+/* speaking — 斑块持续流动 */
+
+.thinking-fog.speaking .fmist {
+  opacity: 0.75;
+  animation-duration: 20s !important;
+}
+
+/* interrupted — 快速淡化 */
+
+.thinking-fog.interrupted .fmist {
+  opacity: 0.2;
+}
+
+/* 斑块1 — 左上大面积奶白雾 */
+
+.fmist-1 {
+  width: 45vw;
+  height: 38vh;
+  top: -10%;
+  left: -12%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.35) 0%, rgba(220,240,255,0.18) 45%, transparent 68%);
+  filter: blur(40px);
+  animation: fd1 20s ease-in-out infinite;
+}
+@keyframes fd1 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  16%      { transform: translate(80px,-50px) scale(1.3); filter: blur(52px); }
+  33%      { transform: translate(-40px,80px) scale(0.85); filter: blur(32px); }
+  50%      { transform: translate(100px,30px) scale(1.4);  filter: blur(58px); }
+  66%      { transform: translate(-60px,-40px) scale(0.9);  filter: blur(36px); }
+  83%      { transform: translate(50px,70px) scale(1.2);  filter: blur(48px); }
+}
+
+/* 斑块2 — 右上冰蓝雾 */
+
+.fmist-2 {
+  width: 38vw;
+  height: 34vh;
+  top: -8%;
+  right: -10%;
+  background: radial-gradient(ellipse, rgba(190,235,255,0.30) 0%, rgba(155,210,250,0.14) 48%, transparent 70%);
+  filter: blur(35px);
+  animation: fd2 24s ease-in-out infinite;
+}
+@keyframes fd2 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  14%      { transform: translate(-90px,60px) scale(1.35); filter: blur(46px); }
+  29%      { transform: translate(50px,-70px) scale(0.78); filter: blur(26px); }
+  43%      { transform: translate(-70px,30px) scale(1.42); filter: blur(50px); }
+  57%      { transform: translate(60px,-50px) scale(0.86); filter: blur(30px); }
+  71%      { transform: translate(-50px,70px) scale(1.28); filter: blur(42px); }
+  86%      { transform: translate(80px,-30px) scale(1.1);  filter: blur(37px); }
+}
+
+/* 斑块3 — 左中天蓝雾（带旋转） */
+
+.fmist-3 {
+  width: 50vw;
+  height: 42vh;
+  top: 25%;
+  left: -15%;
+  background: radial-gradient(ellipse, rgba(130,195,255,0.26) 0%, rgba(90,160,240,0.12) 48%, transparent 68%);
+  filter: blur(44px);
+  animation: fd3 18s ease-in-out infinite;
+}
+@keyframes fd3 {
+  0%,100% { transform: translate(0,0) scale(1) rotate(0deg); }
+  12%      { transform: translate(100px,-60px) scale(1.45) rotate(8deg);  filter: blur(56px); }
+  25%      { transform: translate(-50px,90px) scale(0.76) rotate(-5deg); filter: blur(32px); }
+  38%      { transform: translate(80px,40px) scale(1.32) rotate(6deg);  filter: blur(50px); }
+  52%      { transform: translate(-80px,-50px) scale(0.84) rotate(-4deg); filter: blur(36px); }
+  67%      { transform: translate(60px,80px) scale(1.38) rotate(7deg);  filter: blur(54px); }
+  82%      { transform: translate(-40px,-30px) scale(1.1) rotate(2deg);  filter: blur(40px); }
+}
+
+/* 斑块4 — 右中青色雾 */
+
+.fmist-4 {
+  width: 42vw;
+  height: 36vh;
+  top: 30%;
+  right: -12%;
+  background: radial-gradient(ellipse, rgba(160,220,255,0.24) 0%, rgba(110,180,245,0.10) 50%, transparent 72%);
+  filter: blur(38px);
+  animation: fd4 22s ease-in-out infinite;
+}
+@keyframes fd4 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  11%      { transform: translate(-100px,70px) scale(1.38); filter: blur(50px); }
+  24%      { transform: translate(60px,-80px) scale(0.72); filter: blur(28px); }
+  38%      { transform: translate(-40px,50px) scale(1.28); filter: blur(46px); }
+  51%      { transform: translate(80px,-60px) scale(0.82); filter: blur(32px); }
+  64%      { transform: translate(-70px,70px) scale(1.35); filter: blur(48px); }
+  78%      { transform: translate(50px,-50px) scale(1.14); filter: blur(40px); }
+  91%      { transform: translate(-60px,30px) scale(1.24); filter: blur(44px); }
+}
+
+/* 斑块5 — 底部深蓝雾 */
+
+.fmist-5 {
+  width: 55vw;
+  height: 32vh;
+  bottom: -12%;
+  left: -8%;
+  background: radial-gradient(ellipse, rgba(60,120,210,0.20) 0%, rgba(25,80,170,0.09) 50%, transparent 72%);
+  filter: blur(48px);
+  animation: fd5 26s ease-in-out infinite;
+}
+@keyframes fd5 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  13%      { transform: translate(-80px,-60px) scale(1.32); filter: blur(58px); }
+  27%      { transform: translate(90px,30px) scale(0.78); filter: blur(36px); }
+  41%      { transform: translate(-50px,-80px) scale(1.42); filter: blur(62px); }
+  56%      { transform: translate(100px,50px) scale(0.74); filter: blur(34px); }
+  70%      { transform: translate(-70px,-30px) scale(1.28); filter: blur(52px); }
+  85%      { transform: translate(60px,60px) scale(1.16); filter: blur(44px); }
+}
+
+/* 斑块6 — 右下暗蓝微光 */
+
+.fmist-6 {
+  width: 36vw;
+  height: 30vh;
+  bottom: -6%;
+  right: -8%;
+  background: radial-gradient(ellipse, rgba(90,165,245,0.18) 0%, rgba(50,110,200,0.08) 50%, transparent 72%);
+  filter: blur(34px);
+  animation: fd6 19s ease-in-out infinite;
+}
+@keyframes fd6 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  15%      { transform: translate(80px,-60px) scale(1.4);  filter: blur(44px); }
+  30%      { transform: translate(-60px,50px) scale(0.68); filter: blur(24px); }
+  45%      { transform: translate(70px,-40px) scale(1.3);  filter: blur(40px); }
+  60%      { transform: translate(-80px,60px) scale(0.76); filter: blur(28px); }
+  75%      { transform: translate(50px,-50px) scale(1.35); filter: blur(43px); }
+  90%      { transform: translate(-50px,30px) scale(1.12); filter: blur(36px); }
 }
 
 /* 波形条 — 已隐藏，由水彩光球自身作为状态指示器 */

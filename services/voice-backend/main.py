@@ -320,19 +320,23 @@ def list_voices() -> JSONResponse:
     if pyttsx3 is None:
         return JSONResponse({"voices": [], "note": "pyttsx3 is not installed."})
 
-    engine = pyttsx3.init()
-    voices = engine.getProperty('voices')
-    voice_list = [
-        {
-            "id": v.id,
-            "name": v.name,
-            "languages": getattr(v, 'languages', []),
-            "gender": getattr(v, 'gender', 'unknown'),
-            "age": getattr(v, 'age', None),
-        }
-        for v in voices
-    ]
-    return JSONResponse({"voices": voice_list})
+    try:
+        engine = pyttsx3.init()
+        voices = engine.getProperty('voices')
+        voice_list = [
+            {
+                "id": v.id,
+                "name": v.name,
+                "languages": getattr(v, 'languages', []),
+                "gender": getattr(v, 'gender', 'unknown'),
+                "age": getattr(v, 'age', None),
+            }
+            for v in voices
+        ]
+        return JSONResponse({"voices": voice_list})
+    except Exception as exc:
+        logger.warning("[TTS] Failed to list Windows voices: %s", exc)
+        return JSONResponse({"voices": [], "note": f"pyttsx3 init failed: {exc}"})
 
 
 @app.post("/tts")
@@ -346,6 +350,8 @@ def tts(payload: TextPayload) -> Response:
             rate=payload.rate,
             volume=payload.volume,
         )
+    if not audio_bytes:
+        raise HTTPException(status_code=503, detail="No TTS engine available.")
     return Response(content=audio_bytes, media_type="audio/wav")
 
 
@@ -416,14 +422,13 @@ def gptsovits_status() -> JSONResponse:
         return JSONResponse({"available": False, "reason": "GPT_SOVITS_URL not set"})
 
     try:
-        response = requests.get(f"{gpt_sovits_url}/", timeout=5)
-        if response.status_code == 200 or response.status_code == 405:
-            # 405 表示服务在但方法不对，也说明服务活着
-            return JSONResponse({"available": True, "url": gpt_sovits_url})
+        # 用 OPTIONS 请求检测服务是否在线，避免 GET 触发 GPT-SoVITS 推理报错
+        response = requests.options(f"{gpt_sovits_url}/", timeout=5)
+        return JSONResponse({"available": True, "url": gpt_sovits_url})
+    except requests.exceptions.ConnectionError:
+        return JSONResponse({"available": False, "reason": "Connection refused"})
     except Exception as exc:
         return JSONResponse({"available": False, "reason": str(exc)})
-
-    return JSONResponse({"available": False, "reason": "Unknown"})
 
 
 @app.post("/orchestrate")
@@ -433,3 +438,8 @@ async def orchestrate(payload: Dict[str, Any]) -> JSONResponse:
     """
     messages = payload.get("messages", [])
     return JSONResponse({"messages": messages, "note": "Plug this endpoint into your TEN agent graph."})
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)

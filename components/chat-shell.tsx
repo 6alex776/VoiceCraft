@@ -485,6 +485,17 @@ export function ChatShell() {
 
   return (
     <>
+      {/* ====== 全屏雾气层 — fixed 定位覆盖整个页面（含顶栏/底栏） ====== */}
+      <div className={`thinking-fog ${status}`}>
+        <div className="fog-radial" />
+        <span className="fmist fmist-1" />
+        <span className="fmist fmist-2" />
+        <span className="fmist fmist-3" />
+        <span className="fmist fmist-4" />
+        <span className="fmist fmist-5" />
+        <span className="fmist fmist-6" />
+      </div>
+
       {/* ====== 顶部导航栏 ====== */}
       <header className="top-nav">
         <div className="nav-left">
