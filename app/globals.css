@@ -1,0 +1,1194 @@
+/* ============================================
+   VoiceCraft — ChatGPT Voice 风格桌面端
+   极简白底 + 蓝白渐变光球 + 底部操作栏
+   ============================================ */
+
+:root {
+  color-scheme: light;
+
+  /* 核心色板 */
+  --bg: #ffffff;
+  --bg-subtle: #f7f7f8;
+  --bg-warm: #fafaf9;
+  --surface: #ffffff;
+  --surface-hover: #f5f5f5;
+  --border: #e5e5e5;
+  --border-light: #efefef;
+
+  /* 文字 */
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b6b6b;
+  --text-muted: #9a9a9a;
+  --text-on-accent: #ffffff;
+
+  /* 强调色 — 以蓝为主 */
+  --accent: #0d6efd;
+  --accent-light: #e8f0fe;
+  --accent-soft: rgba(13, 110, 253, 0.08);
+  --orb-top: #d4e8ff;
+  --orb-mid: #7eb8ff;
+  --orb-bottom: #1a73e8;
+  --orb-glow: rgba(26, 115, 232, 0.15);
+
+  /* 状态色 */
+  --danger: #dc3545;
+  --danger-soft: rgba(220, 53, 69, 0.08);
+  --success: #10b981;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.1);
+  --shadow-orb: 0 32px 80px rgba(26, 115, 232, 0.2);
+
+  /* 圆角 */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
+
+  /* 字体 */
+  font-family:
+    -apple-system, 'SF Pro Display', 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+textarea,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+
+/* ========== App Shell ========== */
+
+.app-shell {
+  width: 100%;
+  min-height: 100vh;
+}
+
+.voice-app {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ========== 顶部导航栏 ========== */
+
+.top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px;
+  position: relative;
+  z-index: 20;
+}
+
+.nav-left,
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-title {
+  font-size: 1.12rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+/* 导航按钮 — 圆形透明背景 */
+
+.nav-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  display: grid;
+  place-items: center;
+  transition: background 0.18s ease;
+  position: relative;
+}
+
+.nav-btn:hover {
+  background: var(--surface-hover);
+}
+
+/* 右上角三点下拉菜单 */
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px) scale(0.96);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    pointer-events 0s linear 0.2s;
+}
+
+.dropdown-menu.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease cubic-bezier(0.16, 1, 0.3, 1),
+    pointer-events 0s linear 0s;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.dropdown-item:hover {
+  background: var(--surface-hover);
+}
+
+/* ========== 主舞台区域 ========== */
+
+.voice-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 28px 24px;
+  position: relative;
+  min-height: 0;
+}
+
+/* ========== 光球区域 — 水彩晕染风格 ========== */
+
+.orb-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+  justify-content: center;
+  min-height: 0;
+}
+
+.orb-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* 光球底部的外层柔和光晕 */
+
+.orb-glow {
+  position: absolute;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 40%, rgba(135, 200, 255, 0.2) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 80% at 50% 70%, rgba(26, 115, 232, 0.12) 0%, transparent 55%);
+  filter: blur(35px);
+  opacity: 0.9;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+/* =============================================
+   主光球 — 水彩晕染 / 雾气流动风格
+   上半部：浅天蓝 + 奶白云雾（朦胧柔和）
+   下半部：渐变为饱和深蓝
+   无生硬轮廓，整体水彩晕染质感
+   ============================================= */
+
+.voice-orb {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  /* 多层叠加实现水彩晕染效果 */
+  background:
+    /* 第一层：上半部奶白色云雾核心 */
+    radial-gradient(
+      ellipse 75% 55% at 42% 20%,
+      rgba(255, 252, 248, 0.95) 0%,
+      rgba(240, 248, 255, 0.7) 30%,
+      transparent 58%
+    ),
+    /* 第二层：左上浅天蓝云团 */
+    radial-gradient(
+      ellipse 65% 50% at 22% 28%,
+      rgba(210, 235, 255, 0.85) 0%,
+      rgba(180, 220, 250, 0.45) 35%,
+      transparent 56%
+    ),
+    /* 第三层：右上淡青色云雾 */
+    radial-gradient(
+      ellipse 55% 45% at 72% 18%,
+      rgba(220, 245, 255, 0.8) 0%,
+      rgba(190, 230, 255, 0.4) 32%,
+      transparent 52%
+    ),
+    /* 第四层：中部过渡天蓝色 */
+    radial-gradient(
+      ellipse 70% 55% at 48% 45%,
+      rgba(130, 195, 255, 0.6) 0%,
+      rgba(100, 170, 250, 0.3) 38%,
+      transparent 60%
+    ),
+    /* 第五层：主渐变 — 从浅到深蓝 */
+    linear-gradient(
+      175deg,
+      rgba(230, 245, 255, 0.3) 0%,
+      rgba(140, 200, 255, 0.5) 28%,
+      rgba(80, 150, 235, 0.72) 52%,
+      rgba(30, 100, 210, 0.88) 75%,
+      rgba(15, 65, 160, 0.95) 100%
+    );
+  /* 无边框，靠光晕定义边缘 */
+  box-shadow:
+    0 0 60px 12px rgba(100, 170, 240, 0.12),
+    0 0 120px 30px rgba(80, 140, 220, 0.06);
+  animation: orbIdleFloat 8s ease-in-out infinite,
+             orbIdleMist 12s ease-in-out infinite;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+  overflow: visible; /* 允许雾气斑块飘出球面边界 */
+}
+
+/* 水彩纹理层 — 改为内部雾气斑块元素驱动，不再依赖伪元素 */
+
+.voice-orb::before {
+  /* 保留表面高光 */
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    ellipse 42% 30% at 26% 16%,
+    rgba(255, 255, 255, 0.45) 0%,
+    transparent 58%
+  );
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+.voice-orb::after {
+  display: none; /* 不再使用 ::after */
+}
+
+/*
+ * 雾气斑块系统 — 8 个独立漂移的模糊色块
+ * 设计原则：高反差颜色 + 大幅位移 + 快速不规则运动
+ */
+
+.mist {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity, filter, left, top;
+}
+
+/* ====== 斑块1 — 奶白大云团（左上） ====== */
+.mist-1 {
+  width: 70%;
+  height: 60%;
+  top: -15%;
+  left: -18%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.9) 0%, rgba(230,245,255,0.5) 35%, transparent 65%);
+  filter: blur(24px);
+  animation: d1 14s ease-in-out infinite;
+}
+@keyframes d1 {
+  0%   { transform: translate(0,0) scale(1);     opacity: 0.88; }
+  10%  { transform: translate(50px,-30px) scale(1.3); opacity: 0.95; filter: blur(28px); }
+  22%  { transform: translate(-20px,55px) scale(1.15); opacity: 0.7;  filter: blur(20px); }
+  34%  { transform: translate(65px,30px) scale(1.42); opacity: 1;    filter: blur(34px); }
+  46%  { transform: translate(-35px,-18px) scale(1.08); opacity: 0.62; filter: blur(17px); }
+  58%  { transform: translate(28px,70px) scale(1.25); opacity: 0.88; filter: blur(27px); }
+  72%  { transform: translate(-52px,16px) scale(1.35); opacity: 0.92; filter: blur(31px); }
+  86%  { transform: translate(40px,-40px) scale(1.2);  opacity: 0.82; filter: blur(25px); }
+  100% { transform: translate(0,0) scale(1);       opacity: 0.88; }
+}
+
+/* ====== 斑块2 — 冰蓝云团（右上） ====== */
+.mist-2 {
+  width: 58%;
+  height: 52%;
+  top: -18%;
+  right: -16%;
+  background: radial-gradient(ellipse, rgba(200,240,255,0.85) 0%, rgba(160,215,250,0.42) 38%, transparent 62%);
+  filter: blur(20px);
+  animation: d2 16s ease-in-out infinite;
+}
+@keyframes d2 {
+  0%   { transform: translate(0,0) scale(1);      opacity: 0.82; }
+  11%  { transform: translate(-58px,38px) scale(1.35); opacity: 0.95; filter: blur(26px); }
+  24%  { transform: translate(24px,-48px) scale(0.82); opacity: 0.55; filter: blur(13px); }
+  37%  { transform: translate(-72px,18px) scale(1.48); opacity: 1;    filter: blur(30px); }
+  49%  { transform: translate(14px,56px) scale(1.05); opacity: 0.68; filter: blur(17px); }
+  62%  { transform: translate(-40px,-28px) scale(1.28); opacity: 0.88; filter: blur(25px); }
+  75%  { transform: translate(32px,26px) scale(1.18);  opacity: 0.78; filter: blur(21px); }
+  88%  { transform: translate(-50px,-44px) scale(1.32); opacity: 0.9;  filter: blur(29px); }
+  100% { transform: translate(0,0) scale(1);       opacity: 0.82; }
+}
+
+/* ====== 斑块3 — 天蓝中景（左中，带旋转） ====== */
+.mist-3 {
+  width: 64%;
+  height: 56%;
+  top: 18%;
+  left: -14%;
+  background: radial-gradient(ellipse, rgba(140,205,255,0.7) 0%, rgba(90,165,240,0.32) 40%, transparent 58%);
+  filter: blur(26px);
+  animation: d3 12s ease-in-out infinite;
+}
+@keyframes d3 {
+  0%   { transform: translate(0,0) scale(1) rotate(0deg);    opacity: 0.75; }
+  9%   { transform: translate(68px,-36px) scale(1.45) rotate(12deg);  opacity: 1;  filter: blur(36px); }
+  19%  { transform: translate(-24px,58px) scale(0.78) rotate(-6deg); opacity: 0.5; filter: blur(16px); }
+  31%  { transform: translate(46px,22px) scale(1.32) rotate(8deg);   opacity: 0.92; filter: blur(32px); }
+  43%  { transform: translate(-56px,-32px) scale(0.86) rotate(-4deg); opacity: 0.55; filter: blur(19px); }
+  55%  { transform: translate(34px,54px) scale(1.38) rotate(10deg);  opacity: 0.95; filter: blur(34px); }
+  67%  { transform: translate(-18px,-26px) scale(1.1) rotate(2deg);   opacity: 0.68; filter: blur(22px); }
+  79%  { transform: translate(54px,14px) scale(1.25) rotate(6deg);   opacity: 0.85; filter: blur(28px); }
+  91%  { transform: translate(-38px,-48px) scale(1.18) rotate(-3deg); opacity: 0.72; filter: blur(23px); }
+  100% { transform: translate(0,0) scale(1) rotate(0deg);        opacity: 0.75; }
+}
+
+/* ====== 斑块4 — 青色流动（右中） ====== */
+.mist-4 {
+  width: 52%;
+  height: 48%;
+  top: 25%;
+  right: -12%;
+  background: radial-gradient(ellipse, rgba(170,225,255,0.68) 0%, rgba(110,185,245,0.28) 42%, transparent 60%);
+  filter: blur(22px);
+  animation: d4 15s ease-in-out infinite;
+}
+@keyframes d4 {
+  0%   { transform: translate(0,0) scale(1);     opacity: 0.72; }
+  9%   { transform: translate(-62px,48px) scale(1.4);  opacity: 0.98; filter: blur(30px); }
+  19%  { transform: translate(36px,-52px) scale(0.72); opacity: 0.42; filter: blur(14px); }
+  30%  { transform: translate(-18px,34px) scale(1.28);  opacity: 0.88; filter: blur(28px); }
+  41%  { transform: translate(52px,-22px) scale(0.84); opacity: 0.5;  filter: blur(16px); }
+  53%  { transform: translate(-44px,58px) scale(1.35);  opacity: 0.95; filter: blur(31px); }
+  66%  { transform: translate(22px,-36px) scale(1.12);  opacity: 0.72; filter: blur(22px); }
+  78%  { transform: translate(-56px,28px) scale(1.3);   opacity: 0.86; filter: blur(27px); }
+  89%  { transform: translate(38px,-44px) scale(1.08);  opacity: 0.64; filter: blur(18px); }
+  100% { transform: translate(0,0) scale(1);       opacity: 0.72; }
+}
+
+/* ====== 斑块5 — 深蓝底层（底部中央偏左） ====== */
+.mist-5 {
+  width: 76%;
+  height: 48%;
+  bottom: -20%;
+  left: -8%;
+  background: radial-gradient(ellipse, rgba(60,130,220,0.5) 0%, rgba(25,80,170,0.22) 44%, transparent 62%);
+  filter: blur(30px);
+  animation: d5 18s ease-in-out infinite;
+}
+@keyframes d5 {
+  0%   { transform: translate(0,0) scale(1);    opacity: 0.65; }
+  7%   { transform: translate(-42px,-52px) scale(1.35); opacity: 0.9;  filter: blur(38px); }
+  16%  { transform: translate(54px,22px) scale(0.82); opacity: 0.42; filter: blur(20px); }
+  27%  { transform: translate(-22px,-66px) scale(1.45); opacity: 1;   filter: blur(42px); }
+  39%  { transform: translate(62px,36px) scale(0.78); opacity: 0.38; filter: blur(21px); }
+  51%  { transform: translate(-48px,-18px) scale(1.28); opacity: 0.85; filter: blur(34px); }
+  63%  { transform: translate(30px,52px) scale(1.15); opacity: 0.72; filter: blur(27px); }
+  76%  { transform: translate(-16px,-30px) scale(1.32); opacity: 0.88; filter: blur(36px); }
+  88%  { transform: translate(46px,18px) scale(1.08); opacity: 0.6;  filter: blur(22px); }
+  100% { transform: translate(0,0) scale(1);    opacity: 0.65; }
+}
+
+/* ====== 斑块6 — 暗蓝右下角 ====== */
+.mist-6 {
+  width: 54%;
+  height: 44%;
+  bottom: -10%;
+  right: -14%;
+  background: radial-gradient(ellipse, rgba(100,170,245,0.48) 0%, rgba(50,110,200,0.2) 40%, transparent 58%);
+  filter: blur(24px);
+  animation: d6 13s ease-in-out infinite;
+}
+@keyframes d6 {
+  0%   { transform: translate(0,0) scale(1);    opacity: 0.58; }
+  9%   { transform: translate(58px,-44px) scale(1.45); opacity: 0.88; filter: blur(33px); }
+  19%  { transform: translate(-32px,38px) scale(0.68); opacity: 0.32; filter: blur(14px); }
+  30%  { transform: translate(46px,-22px) scale(1.32); opacity: 0.82; filter: blur(29px); }
+  42%  { transform: translate(-54px,52px) scale(0.75); opacity: 0.4;  filter: blur(17px); }
+  54%  { transform: translate(30px,-36px) scale(1.38); opacity: 0.9;  filter: blur(34px); }
+  66%  { transform: translate(-22px,30px) scale(1.05); opacity: 0.58; filter: blur(22px); }
+  78%  { transform: translate(42px,18px) scale(1.22); opacity: 0.78; filter: blur(28px); }
+  90%  { transform: translate(-38px,-28px) scale(1.15); opacity: 0.65; filter: blur(24px); }
+  100% { transform: translate(0,0) scale(1);    opacity: 0.58; }
+}
+
+/* ====== 斑块7 — 白色高光点缀（顶部中央，快速穿梭） ====== */
+.mist-7 {
+  width: 40%;
+  height: 34%;
+  top: 5%;
+  left: 25%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.8) 0%, rgba(210,235,255,0.35) 45%, transparent 65%);
+  filter: blur(16px);
+  animation: d7 11s ease-in-out infinite;
+}
+@keyframes d7 {
+  0%   { transform: translate(0,0) scale(1);    opacity: 0.7; }
+  8%   { transform: translate(-58px,42px) scale(1.5);  opacity: 1;  filter: blur(24px); }
+  18%  { transform: translate(38px,-52px) scale(0.65); opacity: 0.3; filter: blur(10px); }
+  29%  { transform: translate(-46px,26px) scale(1.42); opacity: 0.95; filter: blur(23px); }
+  41%  { transform: translate(52px,-28px) scale(0.72); opacity: 0.38; filter: blur(11px); }
+  53%  { transform: translate(-32px,48px) scale(1.35); opacity: 0.88; filter: blur(22px); }
+  65%  { transform: translate(40px,-18px) scale(0.82); opacity: 0.45; filter: blur(12px); }
+  77%  { transform: translate(-24px,-38px) scale(1.28); opacity: 0.82; filter: blur(21px); }
+  89%  { transform: translate(34px,24px) scale(1.12); opacity: 0.68; filter: blur(18px); }
+  100% { transform: translate(0,0) scale(1);    opacity: 0.7; }
+}
+
+/* ====== 斑块8 — 淡青微光（中部右侧，斜向穿越） ====== */
+.mist-8 {
+  width: 46%;
+  height: 40%;
+  top: 40%;
+  right: 5%;
+  background: radial-gradient(ellipse, rgba(190,235,255,0.6) 0%, rgba(130,195,245,0.25) 44%, transparent 62%);
+  filter: blur(20px);
+  animation: d8 14.5s ease-in-out infinite;
+}
+@keyframes d8 {
+  0%   { transform: translate(0,0) scale(1);    opacity: 0.65; }
+  8%   { transform: translate(-56px,-38px) scale(1.38); opacity: 0.92; filter: blur(28px); }
+  17%  { transform: translate(38px,54px) scale(0.72); opacity: 0.38; filter: blur(13px); }
+  27%  { transform: translate(-48px,22px) scale(1.3);  opacity: 0.85; filter: blur(26px); }
+  37%  { transform: translate(52px,-44px) scale(0.78); opacity: 0.42; filter: blur(14px); }
+  48%  { transform: translate(-30px,38px) scale(1.35); opacity: 0.9;  filter: blur(29px); }
+  59%  { transform: translate(34px,-26px) scale(0.88); opacity: 0.52; filter: blur(16px); }
+  71%  { transform: translate(-42px,18px) scale(1.22); opacity: 0.78; filter: blur(25px); }
+  84%  { transform: translate(28px,-34px) scale(1.08); opacity: 0.6;  filter: blur(19px); }
+  96%  { transform: translate(-36px,26px) scale(1.18); opacity: 0.74; filter: blur(23px); }
+  100% { transform: translate(0,0) scale(1);    opacity: 0.65; }
+}
+
+/* 状态文字 */
+
+.status-text {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  transition: color 0.2s ease;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.status-text.active {
+  color: var(--text-secondary);
+}
+
+/* 波形条 — 已隐藏，由水彩光球自身作为状态指示器 */
+
+.waveform {
+  display: none;
+}
+
+/* ========== 底部操作栏 ========== */
+
+.bottom-bar {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 16px 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  position: relative;
+  z-index: 20;
+}
+
+/* 输入框区域 — 纯输入框，无加号 */
+
+.input-area {
+  flex: 1;
+  max-width: 480px;
+  display: flex;
+  align-items: center;
+  height: 50px;
+  padding: 0 20px;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.input-area:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.text-input-field {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.text-input-field::placeholder {
+  color: var(--text-muted);
+}
+
+/* 输入框内发送按钮 */
+
+.send-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    opacity 0.18s ease,
+    transform 0.15s ease;
+}
+
+.send-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.send-btn:hover {
+  background: #0b5ed7;
+}
+
+.send-btn:active {
+  transform: scale(0.93);
+}
+
+.send-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* 麦克风按钮 */
+
+.mic-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.mic-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.mic-btn.recording {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  animation: micPulse 1.6s ease-in-out infinite;
+}
+
+.mic-btn:active {
+  transform: scale(0.95);
+}
+
+/* 麦克风图标 — SVG 内联方式，由组件传入 */
+
+.mic-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 停止/关闭按钮 */
+
+.stop-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--text-primary);
+  color: var(--bg);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease,
+    opacity 0.2s ease;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.stop-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.stop-btn:hover {
+  background: var(--danger);
+}
+
+.stop-btn:active {
+  transform: scale(0.95);
+}
+
+/* 三点菜单图标 — SVG 内联 */
+
+.nav-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* X 图标 — SVG 内联 */
+
+.stop-btn svg,
+.side-panel-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ========== 侧边面板内音色设置 ========== */
+
+.settings-section {
+  border-top: 1px solid var(--border-light);
+  padding-top: 16px;
+}
+
+/* 侧面板内的音色设置按钮 */
+
+.settings-section .settings-toggle {
+  height: 34px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  padding: 0 14px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.settings-section .settings-toggle:hover {
+  background: var(--surface-hover);
+}
+
+.settings-panel {
+  margin-top: 12px;
+  width: 100%;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  display: grid;
+  gap: 14px;
+}
+
+.setting-row {
+  display: grid;
+  gap: 8px;
+}
+
+.setting-row label {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.switch-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.switch-label input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.setting-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.setting-row select {
+  height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  padding: 0 14px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.18s ease;
+}
+
+.setting-row select:focus {
+  border-color: var(--accent);
+}
+
+.setting-row input[type='text'] {
+  height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  padding: 0 14px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.18s ease;
+}
+
+.setting-row input[type='text']:focus {
+  border-color: var(--accent);
+}
+
+.setting-row input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+  height: 6px;
+}
+
+/* ========== 侧边对话面板（可拉伸） ========== */
+
+.side-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(420px, 90vw);
+  height: 100vh;
+  background: var(--surface);
+  border-left: 1px solid var(--border-light);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.05s linear;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.side-panel.open {
+  transform: translateX(0);
+}
+
+/* 左边缘拉伸手柄 */
+
+.resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  z-index: 10;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 40px;
+  background: var(--border-light);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.resize-handle:hover::after {
+  opacity: 1;
+}
+
+.side-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.side-panel-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.side-panel-close {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.side-panel-close:hover {
+  background: var(--border);
+}
+
+.side-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 22px;
+  display: grid;
+  gap: 16px;
+}
+
+.message-card {
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+}
+
+.message-card .card-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.message-card p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.7;
+  font-size: 0.94rem;
+  color: var(--text-primary);
+}
+
+.message-card.user-msg {
+  background: var(--accent-soft);
+  border-color: rgba(13, 110, 253, 0.12);
+}
+
+/* 空状态提示 */
+
+.empty-hint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 40px 0;
+}
+
+.error-message {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.88rem;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+}
+
+/* ========== 遮罩层（侧面板打开时）========== */
+
+.overlay-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.15);
+  z-index: 40;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.overlay-mask.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ========== 光球状态动画 — 水彩律动 ========== */
+
+/* 空闲 — 缓慢漂浮 + 雾气微动（已在 .voice-orb 基础样式中定义）*/
+
+/* 录音中（用户说话）— 水彩随音量律动形变 */
+
+.voice-orb.listening {
+  animation:
+    orbListenPulse 1.5s ease-in-out infinite,
+    orbMistRipple 2s ease-in-out infinite;
+}
+
+.voice-orb.listening .orb-glow {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+/* 思考中 — 雾气缓慢呼吸流动 */
+
+.voice-orb.thinking {
+  animation:
+    orbThinkBreath 4s ease-in-out infinite,
+    orbMistDrift 6s ease-in-out infinite;
+}
+
+/* 说话中（AI 回复）— 温和的流动脉动 */
+
+.voice-orb.speaking {
+  animation:
+    orbSpeakFlow 3s ease-in-out infinite,
+    orbSpeakMist 4.5s ease-in-out infinite;
+}
+
+/* 被打断 — 快速闪烁后恢复 */
+
+.voice-orb.interrupted {
+  animation: orbInterruptFlash 1s ease-in-out infinite;
+}
+
+/* =============================================
+   动画关键帧定义
+   ============================================= */
+
+/* 空闲：轻微上下浮动 */
+
+@keyframes orbIdleFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-7px) scale(1.008); }
+}
+
+/* 空闲：雾气极慢漂移 */
+
+@keyframes orbIdleMist {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  50%      { filter: brightness(1.02) saturate(1.05); }
+}
+
+/* 录音中：水彩球体随声音脉冲缩放 + 轻微形变 */
+
+@keyframes orbListenPulse {
+  0%, 100% {
+    transform: scale(1) scaleX(1);
+    box-shadow:
+      0 0 60px 12px rgba(100, 170, 240, 0.12),
+      0 0 120px 30px rgba(80, 140, 220, 0.06);
+  }
+  25% {
+    transform: scale(1.04) scaleX(1.02);
+    box-shadow:
+      0 0 70px 18px rgba(100, 180, 250, 0.2),
+      0 0 140px 40px rgba(80, 150, 230, 0.1);
+  }
+  50% {
+    transform: scale(1.065) scaleX(1.03);
+    box-shadow:
+      0 0 80px 24px rgba(90, 170, 245, 0.28),
+      0 0 160px 50px rgba(70, 140, 225, 0.14);
+  }
+  75% {
+    transform: scale(1.03) scaleX(1.01);
+    box-shadow:
+      0 0 65px 15px rgba(100, 175, 248, 0.18),
+      0 0 130px 36px rgba(75, 145, 228, 0.09);
+  }
+}
+
+/* 录音中：水彩纹理涟漪模糊 */
+
+@keyframes orbMistRipple {
+  0%, 100% { filter: blur(0px) brightness(1); }
+  50%      { filter: blur(0.6px) brightness(1.05); }
+}
+
+/* 思考中：整体柔和呼吸 */
+
+@keyframes orbThinkBreath {
+  0%, 100% {
+    transform: scale(1);
+    filter: brightness(0.97) saturate(0.95);
+  }
+  50% {
+    transform: scale(1.025);
+    filter: brightness(1.03) saturate(1.05);
+  }
+}
+
+/* 思考中：雾气透明度漂移 */
+
+@keyframes orbMistDrift {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; }
+}
+
+/* 说话中：水彩流动感脉动 */
+
+@keyframes orbSpeakFlow {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 60px 12px rgba(100, 170, 240, 0.14),
+      0 0 120px 30px rgba(80, 140, 220, 0.07);
+  }
+  33% {
+    transform: scale(1.022) scaleY(0.98);
+  }
+  66% {
+    transform: scale(1.012) scaleY(1.01);
+  }
+}
+
+/* 说话中：雾气层亮度流动 */
+
+@keyframes orbSpeakMist {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.03) saturate(1.04); }
+}
+
+/* 打断：快速闪烁 */
+
+@keyframes orbInterruptFlash {
+  0%, 100% {
+    transform: scale(1);
+    filter: saturate(1) brightness(1);
+  }
+  25% {
+    transform: scale(0.96);
+    filter: saturate(1.3) brightness(1.05);
+  }
+  50% {
+    transform: scale(0.99);
+    filter: saturate(0.85) brightness(0.96);
+  }
+  75% {
+    transform: scale(0.97);
+    filter: saturate(1.15) brightness(1.02);
+  }
+}
+
+/* ========== 响应式适配 ========== */
+
+@media (max-width: 768px) {
+  .voice-orb {
+    width: 200px;
+    height: 200px;
+  }
+
+  .orb-glow {
+    width: 260px;
+    height: 260px;
+  }
+
+  .bottom-bar {
+    max-width: 100%;
+    padding: 12px 16px 8px;
+  }
+
+  .side-panel {
+    width: 100vw;
+  }
+
+  .top-nav {
+    padding: 12px 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .voice-orb {
+    width: 170px;
+    height: 170px;
+  }
+
+  .input-area {
+    height: 46px;
+  }
+
+  .mic-btn,
+  .stop-btn {
+    width: 46px;
+    height: 46px;
+  }
+}

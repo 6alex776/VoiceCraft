@@ -1,0 +1,36 @@
+# 依赖
+node_modules/
+.venv/
+
+# Next.js 构建输出
+.next/
+out/
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+
+# 临时文件
+*.tmp
+*.temp
