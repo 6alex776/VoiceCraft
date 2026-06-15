@@ -1,7 +1,9 @@
 {
   "name": "voicecraft-realtime-local",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0",
+  "description": "本地部署的实时语音对话系统，集成 Ollama LLM、faster-whisper ASR、GPT-SoVITS 高级音色合成，支持语音识别-对话-语音回复全链路",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
