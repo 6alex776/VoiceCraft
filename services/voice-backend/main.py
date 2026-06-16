@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
+import struct
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Generator, Optional
 
 import requests
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 # 配置日志输出
@@ -50,6 +53,26 @@ class GptSoVitsPayload(BaseModel):
     top_p: Optional[float] = 0.6
     temperature: Optional[float] = 0.6
     speed: Optional[float] = 1.0            # 语速倍数
+
+
+class StreamTtsPayload(BaseModel):
+    """流式 TTS 请求参数"""
+    text: str
+    engine: Optional[str] = "default"       # TTS 引擎："default" 或 "gptsovits"
+    # 默认引擎参数（Piper / Windows TTS）
+    voice_id: Optional[str] = None          # Windows TTS 语音 ID 或 Piper 模型路径
+    rate: Optional[int] = None              # 语速百分比
+    volume: Optional[int] = None            # 音量百分比
+    # GPT-SoVITS 参数（gptsovits_ 前缀）
+    gptsovits_ref_wav_path: Optional[str] = None
+    gptsovits_prompt_text: Optional[str] = None
+    gptsovits_prompt_language: Optional[str] = "zh"
+    gptsovits_text_language: Optional[str] = "zh"
+    gptsovits_how_to_cut: Optional[str] = "凑四句一切"
+    gptsovits_top_k: Optional[int] = 20
+    gptsovits_top_p: Optional[float] = 0.6
+    gptsovits_temperature: Optional[float] = 0.6
+    gptsovits_speed: Optional[float] = 1.0
 
 
 app = FastAPI(title="VoiceCraft Voice Backend", version="0.1.0")
@@ -438,6 +461,160 @@ async def orchestrate(payload: Dict[str, Any]) -> JSONResponse:
     """
     messages = payload.get("messages", [])
     return JSONResponse({"messages": messages, "note": "Plug this endpoint into your TEN agent graph."})
+
+
+def split_sentences(text: str, max_length: int = 50) -> list[str]:
+    """
+    将文本按句子切分。
+    先按中文句号、问号、感叹号、换行等切分；
+    如果某段超过 max_length 个字符，则再按逗号等进一步切分。
+    """
+    # 第一步：按句末标点和换行切分
+    primary_splits = re.split(r'(?<=[。！？!?\n])', text)
+    # 过滤空白段
+    primary_splits = [s.strip() for s in primary_splits if s.strip()]
+
+    # 第二步：对超长段落按逗号、分号等进一步切分
+    result: list[str] = []
+    for segment in primary_splits:
+        if len(segment) <= max_length:
+            result.append(segment)
+        else:
+            # 按逗号、分号等切分
+            sub_splits = re.split(r'(?<=[，,；;：:])', segment)
+            sub_splits = [s.strip() for s in sub_splits if s.strip()]
+            # 合并过短的子段，避免产生太碎的片段
+            buffer = ""
+            for sub in sub_splits:
+                if buffer and len(buffer) + len(sub) > max_length:
+                    result.append(buffer)
+                    buffer = sub
+                else:
+                    buffer = buffer + sub if buffer else sub
+            if buffer:
+                result.append(buffer)
+
+    return result
+
+
+def _synthesize_default(text: str, voice_id: Optional[str], rate: Optional[int], volume: Optional[int]) -> bytes:
+    """使用默认引擎（Piper 优先，回退到 Windows TTS）合成音频"""
+    try:
+        return synthesize_with_piper(text)
+    except HTTPException:
+        return synthesize_with_windows_tts(text, voice_id=voice_id, rate=rate, volume=volume)
+
+
+def _synthesize_gptsovits(text: str, payload: StreamTtsPayload) -> bytes:
+    """使用 GPT-SoVITS 引擎合成音频"""
+    gpt_sovits_url = get_gpt_sovits_url()
+    if not gpt_sovits_url:
+        raise HTTPException(
+            status_code=503,
+            detail="GPT-SoVITS is not configured. Set GPT_SOVITS_URL environment variable.",
+        )
+
+    # 构建 GPT-SoVITS API 请求参数
+    api_payload = {
+        "text": text,
+        "text_language": payload.gptsovits_text_language,
+        "prompt_language": payload.gptsovits_prompt_language,
+        "how_to_cut": payload.gptsovits_how_to_cut,
+        "top_k": payload.gptsovits_top_k,
+        "top_p": payload.gptsovits_top_p,
+        "temperature": payload.gptsovits_temperature,
+        "speed": payload.gptsovits_speed,
+    }
+
+    # 可选的参考音频参数
+    if payload.gptsovits_ref_wav_path:
+        api_payload["ref_wav_path"] = payload.gptsovits_ref_wav_path
+    if payload.gptsovits_prompt_text:
+        api_payload["prompt_text"] = payload.gptsovits_prompt_text
+
+    # 发送请求到 GPT-SoVITS 服务
+    response = requests.post(
+        f"{gpt_sovits_url}/",
+        json=api_payload,
+        timeout=120,
+    )
+    response.raise_for_status()
+    return response.content
+
+
+def generate_stream(payload: StreamTtsPayload) -> Generator[bytes, None, None]:
+    """
+    流式 TTS 生成器：逐句合成音频，并以二进制帧格式输出。
+    每个帧的格式：
+      - 4字节（小端序）：JSON 元数据的长度
+      - JSON 元数据（包含 sentence_index, total_sentences, text, format 等）
+      - 4字节（小端序）：音频数据的长度
+      - 音频二进制数据（WAV 格式）
+
+    GPT-SoVITS 引擎不切句，整段发送让它自己内部切分，避免多次请求开销。
+    """
+    # GPT-SoVITS 整段发送，不切句（它内部有 how_to_cut 参数控制切分）
+    if payload.engine == "gptsovits":
+        sentences = [payload.text]
+    else:
+        sentences = split_sentences(payload.text)
+
+    total = len(sentences)
+
+    if total == 0:
+        return
+
+    for idx, sentence in enumerate(sentences):
+        try:
+            # 根据引擎选择合成方式
+            if payload.engine == "gptsovits":
+                audio_bytes = _synthesize_gptsovits(sentence, payload)
+            else:
+                audio_bytes = _synthesize_default(
+                    sentence,
+                    voice_id=payload.voice_id,
+                    rate=payload.rate,
+                    volume=payload.volume,
+                )
+
+            # 构建 JSON 元数据
+            metadata = {
+                "sentence_index": idx,
+                "total_sentences": total,
+                "text": sentence,
+                "format": "wav",
+                "engine": payload.engine,
+            }
+            metadata_bytes = json.dumps(metadata, ensure_ascii=False).encode("utf-8")
+
+            # 写入帧：元数据长度 + 元数据 + 音频长度 + 音频数据
+            yield struct.pack("<I", len(metadata_bytes))
+            yield metadata_bytes
+            yield struct.pack("<I", len(audio_bytes))
+            yield audio_bytes
+
+            logger.info("[StreamTTS] 句子 %d/%d 合成完成: %s", idx + 1, total, sentence[:30])
+
+        except Exception as exc:
+            # 合成失败时跳过该句，继续下一句
+            logger.warning("[StreamTTS] 句子 %d/%d 合成失败，跳过: %s - %s", idx + 1, total, sentence[:30], exc)
+            continue
+
+
+@app.post("/tts/stream")
+def tts_stream(payload: StreamTtsPayload) -> StreamingResponse:
+    """
+    流式 TTS 端点：将文本按句子切分后逐句合成音频并流式返回。
+    响应格式为二进制帧流，每帧包含 JSON 元数据和 WAV 音频数据。
+    支持 engine 参数选择 TTS 引擎（"default" 或 "gptsovits"）。
+    """
+    return StreamingResponse(
+        generate_stream(payload),
+        media_type="application/octet-stream",
+        headers={
+            "X-Stream-Format": "binary-frames",  # 自定义头，标识流格式
+        },
+    )
 
 
 if __name__ == "__main__":

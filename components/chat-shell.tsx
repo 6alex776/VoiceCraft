@@ -67,6 +67,159 @@ async function readSseStream(
   }
 }
 
+/** 音频播放队列 — 逐段播放，前一段结束后自动播放下一段 */
+class AudioPlayQueue {
+  private queue: { url: string; blob: Blob }[] = [];
+  private playing = false;
+  private currentAudio: HTMLAudioElement | null = null;
+  private onStatusChange: (playing: boolean) => void;
+  private aborted = false;
+
+  constructor(onStatusChange: (playing: boolean) => void) {
+    this.onStatusChange = onStatusChange;
+  }
+
+  /** 入队一段音频并尝试播放 */
+  enqueue(blob: Blob) {
+    const url = URL.createObjectURL(blob);
+    this.queue.push({ url, blob });
+    if (!this.playing) void this.playNext();
+  }
+
+  /** 播放下一段 */
+  private async playNext() {
+    if (this.aborted || this.queue.length === 0) {
+      this.playing = false;
+      this.onStatusChange(false);
+      return;
+    }
+
+    this.playing = true;
+    this.onStatusChange(true);
+    const { url } = this.queue.shift()!;
+    const audio = new Audio(url);
+    this.currentAudio = audio;
+
+    await new Promise<void>((resolve) => {
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        this.currentAudio = null;
+        resolve();
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        this.currentAudio = null;
+        resolve();
+      };
+      audio.play().catch(() => resolve());
+    });
+
+    void this.playNext();
+  }
+
+  /** 停止播放并清空队列 */
+  stop() {
+    this.aborted = true;
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio = null;
+    }
+    for (const { url } of this.queue) {
+      URL.revokeObjectURL(url);
+    }
+    this.queue = [];
+    this.playing = false;
+    this.onStatusChange(false);
+  }
+}
+
+/** 解析流式 TTS 的二进制帧响应，逐帧 yield 音频 Blob（增量解析，边收边播） */
+async function* parseStreamTtsFrames(
+  response: Response,
+): AsyncGenerator<Blob> {
+  if (!response.body) return;
+  const reader = response.body.getReader();
+
+  // 增量缓冲区：边收数据边解析帧
+  let buffer = new Uint8Array(0);
+
+  /** 从缓冲区头部尝试解析一个完整帧，成功返回帧数据，否则返回 null */
+  function tryParseFrame(): Blob | null {
+    if (buffer.length < 4) return null;
+    const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    const metaLen = view.getUint32(0, true);
+    const headerSize = 4 + metaLen + 4;
+    if (buffer.length < headerSize) return null;
+    const audioLen = view.getUint32(4 + metaLen, true);
+    const totalFrameSize = headerSize + audioLen;
+    if (buffer.length < totalFrameSize) return null;
+    // 提取音频数据
+    const audioData = buffer.slice(headerSize, totalFrameSize);
+    // 从缓冲区移除已解析的帧
+    buffer = buffer.slice(totalFrameSize);
+    return new Blob([audioData], { type: 'audio/wav' });
+  }
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (value) {
+      // 追加新数据到缓冲区
+      const newBuf = new Uint8Array(buffer.length + value.length);
+      newBuf.set(buffer);
+      newBuf.set(value, buffer.length);
+      buffer = newBuf;
+    }
+    // 尝试解析所有完整帧
+    let frame: Blob | null;
+    while ((frame = tryParseFrame()) !== null) {
+      yield frame;
+    }
+    if (done) break;
+  }
+}
+
+/** 将文本按句子切分（用于流式 TTS） */
+function splitIntoSentences(text: string): string[] {
+  // 按中文标点和换行切分
+  const parts = text.split(/([。！？!?\n])/);
+  const sentences: string[] = [];
+  let current = '';
+
+  for (const part of parts) {
+    current += part;
+    // 如果当前部分是终止标点，完成一个句子
+    if (/^[。！？!?]$/.test(part) || part === '\n') {
+      const trimmed = current.trim();
+      if (trimmed) sentences.push(trimmed);
+      current = '';
+    }
+  }
+
+  // 剩余文本
+  const remaining = current.trim();
+  if (remaining) {
+    // 如果太长，按逗号切分
+    if (remaining.length > 50) {
+      const subParts = remaining.split(/([，,；;：:])/);
+      let sub = '';
+      for (const sp of subParts) {
+        sub += sp;
+        if (sub.length > 20 && /^[，,；;：:]$/.test(sp)) {
+          const t = sub.trim();
+          if (t) sentences.push(t);
+          sub = '';
+        }
+      }
+      const lastSub = sub.trim();
+      if (lastSub) sentences.push(lastSub);
+    } else {
+      sentences.push(remaining);
+    }
+  }
+
+  return sentences;
+}
+
 /** 波形可视化组件 */
 function Waveform({ status, cuePulse }: { status: VoiceStatus; cuePulse: boolean }) {
   const isActive = status !== 'idle' || cuePulse;
@@ -97,18 +250,61 @@ export function ChatShell() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [interruptCue, setInterruptCue] = useState<string | null>(null);
 
-  // TTS 音色设置
+  /* ---------- 音色设置持久化（localStorage） ---------- */
+
+  /** localStorage 存储的 key */
+  const VOICE_SETTINGS_KEY = 'voicecraft_voice_settings';
+
+  /** 从 localStorage 加载音色设置 */
+  function loadVoiceSettings() {
+    try {
+      const raw = localStorage.getItem(VOICE_SETTINGS_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw) as {
+        voiceId: string;
+        voiceRate: number;
+        useGptSoVits: boolean;
+        gptSoVitsRefAudio: string;
+        gptSoVitsPromptText: string;
+        gptSoVitsSpeed: number;
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /** 保存音色设置到 localStorage */
+  function saveVoiceSettings() {
+    try {
+      localStorage.setItem(VOICE_SETTINGS_KEY, JSON.stringify({
+        voiceId,
+        voiceRate,
+        useGptSoVits,
+        gptSoVitsRefAudio,
+        gptSoVitsPromptText,
+        gptSoVitsSpeed,
+      }));
+    } catch { /* 静默失败 */ }
+  }
+
+  // TTS 音色设置 — 从 localStorage 恢复初始值
+  const saved = loadVoiceSettings();
   const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
-  const [voiceId, setVoiceId] = useState<string>('');
-  const [voiceRate, setVoiceRate] = useState<number>(0);
+  const [voiceId, setVoiceId] = useState<string>(saved?.voiceId ?? '');
+  const [voiceRate, setVoiceRate] = useState<number>(saved?.voiceRate ?? 0);
   const [availableVoices, setAvailableVoices] = useState<{ id: string; name: string }[]>([]);
 
-  // GPT-SoVITS 设置
-  const [useGptSoVits, setUseGptSoVits] = useState(false);
+  // GPT-SoVITS 设置 — 从 localStorage 恢复初始值
+  const [useGptSoVits, setUseGptSoVits] = useState(saved?.useGptSoVits ?? false);
   const [gptSoVitsAvailable, setGptSoVitsAvailable] = useState(false);
-  const [gptSoVitsRefAudio, setGptSoVitsRefAudio] = useState('');
-  const [gptSoVitsPromptText, setGptSoVitsPromptText] = useState('');
-  const [gptSoVitsSpeed, setGptSoVitsSpeed] = useState(1.0);
+  const [gptSoVitsRefAudio, setGptSoVitsRefAudio] = useState(saved?.gptSoVitsRefAudio ?? '');
+  const [gptSoVitsPromptText, setGptSoVitsPromptText] = useState(saved?.gptSoVitsPromptText ?? '');
+  const [gptSoVitsSpeed, setGptSoVitsSpeed] = useState(saved?.gptSoVitsSpeed ?? 1.0);
+
+  // 音色设置变化时自动保存到 localStorage
+  useEffect(() => {
+    saveVoiceSettings();
+  }, [voiceId, voiceRate, useGptSoVits, gptSoVitsRefAudio, gptSoVitsPromptText, gptSoVitsSpeed]);
 
   /* ---------- 引用 ---------- */
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -117,6 +313,7 @@ export function ChatShell() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const interruptTimerRef = useRef<number | null>(null);
+  const playQueueRef = useRef<AudioPlayQueue | null>(null);
 
   // VAD 相关
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -187,59 +384,12 @@ export function ChatShell() {
   /* ========== TTS 语音合成 ========== */
 
   async function playSpeech(text: string) {
-    // 先停止当前播放
-    audioRef.current?.pause();
-    if (audioUrlRef.current) {
-      URL.revokeObjectURL(audioUrlRef.current);
-      audioUrlRef.current = null;
-    }
-
-    let response: Response;
-
-    if (useGptSoVits && gptSoVitsAvailable) {
-      // 走 GPT-SoVITS 高级音色
-      response = await fetch('/api/voice/tts/gptsovits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          ref_wav_path: gptSoVitsRefAudio || undefined,
-          prompt_text: gptSoVitsPromptText || undefined,
-          speed: gptSoVitsSpeed,
-        }),
-      });
-    } else {
-      // 默认 TTS（Piper / Windows TTS）
-      response = await fetch('/api/voice/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          voice_id: voiceId || undefined,
-          rate: voiceRate || undefined,
-        }),
-      });
-    }
-
-    if (!response.ok) return;
-
-    const audioBlob = await response.blob();
-    const audioUrl = URL.createObjectURL(audioBlob);
-    audioUrlRef.current = audioUrl;
-
-    const audio = new Audio(audioUrl);
-    audioRef.current = audio;
-    setStatus('speaking');
-
-    audio.onended = () => {
-      setStatus('idle');
-      if (audioUrlRef.current) {
-        URL.revokeObjectURL(audioUrlRef.current);
-        audioUrlRef.current = null;
-      }
-    };
-
-    await audio.play();
+    const playQueue = new AudioPlayQueue((playing) => {
+      if (playing) setStatus('speaking');
+      else setStatus('idle'); // 播放完毕回到 idle
+    });
+    playQueueRef.current = playQueue;
+    await requestStreamTts(text, playQueue);
   }
 
   /* ========== 对话请求 ========== */
@@ -252,6 +402,12 @@ export function ChatShell() {
     setErrorMessage(null);
 
     let assistantText = '';
+    let pendingText = ''; // 待送 TTS 的文本缓冲
+    const playQueue = new AudioPlayQueue((playing) => {
+      if (playing) setStatus('speaking');
+      else setStatus('idle'); // 播放完毕回到 idle
+    });
+    playQueueRef.current = playQueue;
 
     try {
       const response = await fetch('/api/chat', {
@@ -263,27 +419,84 @@ export function ChatShell() {
 
       if (!response.ok) throw new Error(`Chat request failed: ${response.status}`);
 
-      // 流式读取 SSE
+      // 流式读取 SSE，按句切分送 TTS
       await readSseStream(
         response,
         (delta) => {
           assistantText += delta;
+          pendingText += delta;
+
+          // 更新消息显示
           setMessages((current) =>
             current.map((m) =>
               m.id === assistantMessageId ? { ...m, content: assistantText } : m,
             ),
           );
-        },
-        () => { setStatus('idle'); },
-      );
 
-      // 文本完成后播放语音
-      if (assistantText.trim()) void playSpeech(assistantText);
+          // GPT-SoVITS 不按句切分，等 LLM 全部完成再整段发送
+          if (useGptSoVits && gptSoVitsAvailable) return;
+
+          // 默认引擎：按句切分，每完成一句立即送 TTS
+          const sentences = splitIntoSentences(pendingText);
+          if (sentences.length > 1) {
+            // 最后一段可能不完整，保留
+            const lastPart = sentences[sentences.length - 1];
+            const completedSentences = sentences.slice(0, -1);
+            pendingText = lastPart;
+
+            // 每个完整句子立即送流式 TTS
+            for (const sentence of completedSentences) {
+              void requestStreamTts(sentence, playQueue, abortController.signal);
+            }
+          }
+        },
+        () => {
+          // LLM 流结束，把剩余文本也送 TTS
+          const remaining = pendingText.trim();
+          if (remaining) {
+            void requestStreamTts(remaining, playQueue, abortController.signal);
+          }
+        },
+      );
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
       const msg = error instanceof Error ? error.message : '模型请求失败';
       setErrorMessage(msg);
       setStatus('idle');
+    }
+  }
+
+  /** 请求流式 TTS 并将音频帧入队播放 */
+  async function requestStreamTts(
+    text: string,
+    playQueue: AudioPlayQueue,
+    signal?: AbortSignal,
+  ) {
+    try {
+      const payload: Record<string, unknown> = { text };
+
+      if (useGptSoVits && gptSoVitsAvailable) {
+        payload.engine = 'gptsovits';
+        payload.gptsovits_ref_wav_path = gptSoVitsRefAudio || undefined;
+        payload.gptsovits_prompt_text = gptSoVitsPromptText || undefined;
+        payload.gptsovits_speed = gptSoVitsSpeed;
+      }
+
+      const response = await fetch('/api/voice/tts/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal,
+      });
+
+      if (!response.ok) return;
+
+      // 解析流式响应，逐帧入队播放
+      for await (const audioBlob of parseStreamTtsFrames(response)) {
+        playQueue.enqueue(audioBlob);
+      }
+    } catch {
+      // TTS 失败静默跳过，不影响对话
     }
   }
 
@@ -310,6 +523,10 @@ export function ChatShell() {
     if (isInterrupted) setInterruptCue('已打断');
 
     abortRef.current?.abort();
+
+    // 停止音频播放队列
+    playQueueRef.current?.stop();
+    playQueueRef.current = null;
 
     if (recorderRef.current && recorderRef.current.state !== 'inactive') {
       recorderRef.current.stop();

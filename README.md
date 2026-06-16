@@ -38,6 +38,7 @@ ollama pull qwen2.5:7b-instruct
 ```cmd
 cd C:\Users\29390\OneDrive\Desktop\project\GPT-SoVITS-v2pro-20250604
 runtime\python.exe api.py -s SoVITS_weights/tomori1_e12_s2664.pth -g GPT_weights/tomori1-e20.ckpt -dr "参考/みんなに届いたなら嬉しい.wav" -dt "みんなに届いたなら嬉しい" -dl ja
+runtime\python.exe api.py -s SoVITS_weights/刻晴_ZH_e10_s490_l32.pth -g GPT_weights/刻晴_ZH-e10.ckpt -dr "参考/这么多式样、这么多质地、这么多选择…啊，这就是「消费」呀，真是令人难以抵御的魅力.wav" -dt "这么多式样、这么多质地、这么多选择…啊，这就是「消费」呀，真是令人难以抵御的魅力" -dl zh
 ```
 
 参数说明：
@@ -75,8 +76,8 @@ npm run dev
 
 1. 打开网页后，点击右上角 **三点菜单** → **音色设置**
 2. 勾选 **"使用 GPT-SoVITS 高级音色"**
-3. 参考音频路径填写：`C:\Users\29390\OneDrive\Desktop\project\GPT-SoVITS-v2pro-20250604\参考\みんなに届いたなら嬉しい.wav`
-4. 参考音频文本填写：`みんなに届いたなら嬉しい`
+3. 参考音频路径填写：`C:\Users\29390\OneDrive\Desktop\project\GPT-SoVITS-v2pro-20250604\参考\みんなに届いたなら嬉しい.wav`,`C:\Users\29390\OneDrive\Desktop\project\GPT-SoVITS-v2pro-20250604\参考\这么多式样、这么多质地、这么多选择…啊，这就是「消费」呀，真是令人难以抵御的魅力.wav`
+4. 参考音频文本填写：`みんなに届いたなら嬉しい`，`这么多式样、这么多质地、这么多选择…啊，这就是「消费」呀，真是令人难以抵御的魅力`
 5. 开始对话
 
 ## 环境变量
