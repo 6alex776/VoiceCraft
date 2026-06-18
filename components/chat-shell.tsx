@@ -433,10 +433,7 @@ export function ChatShell() {
             ),
           );
 
-          // GPT-SoVITS 不按句切分，等 LLM 全部完成再整段发送
-          if (useGptSoVits && gptSoVitsAvailable) return;
-
-          // 默认引擎：按句切分，每完成一句立即送 TTS
+          // 按句切分，每完成一句立即送 TTS（包括 GPT-SoVITS）
           const sentences = splitIntoSentences(pendingText);
           if (sentences.length > 1) {
             // 最后一段可能不完整，保留

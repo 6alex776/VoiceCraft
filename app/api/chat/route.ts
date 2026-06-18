@@ -10,7 +10,7 @@ function buildOllamaEndpoint() {
 }
 
 function buildModelName() {
-  return process.env.OLLAMA_MODEL ?? 'qwen2.5:7b-instruct';
+  return process.env.OLLAMA_MODEL ?? 'qwen3.5-4b-clean';
 }
 
 export async function POST(request: NextRequest) {
@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       model: buildModelName(),
       messages,
       stream: true,
+      think: false,  // 关闭 Qwen3.5 的思考模式，避免生成大量思考 token 导致延迟
       options: {
         temperature: 0.6,
         num_ctx: 8192,

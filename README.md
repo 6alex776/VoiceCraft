@@ -30,7 +30,7 @@ ollama serve
 确保 Ollama 已安装并运行，拉取模型（按你本地实际模型名调整）：
 
 ```bash
-ollama pull qwen2.5:7b-instruct
+ollama pull qwen3.5-4b-clean
 ```
 
 ### 2. 启动 GPT-SoVITS（可选，用于高级音色）
@@ -86,7 +86,7 @@ npm run dev
 
 | 变量 | 说明 | 示例 |
 |------|------|------|
-| `OLLAMA_MODEL` | Ollama 模型名 | `qwen2.5:7b-instruct` |
+| `OLLAMA_MODEL` | Ollama 模型名 | `qwen3.5-4b-clean` |
 | `OLLAMA_CHAT_URL` | Ollama 聊天接口 | `http://127.0.0.1:11434/api/chat` |
 | `VOICE_SERVICE_URL` | 语音后端地址 | `http://127.0.0.1:8001` |
 | `WHISPER_MODEL` | Whisper 模型名 | `base` |

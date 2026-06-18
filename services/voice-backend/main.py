@@ -551,13 +551,10 @@ def generate_stream(payload: StreamTtsPayload) -> Generator[bytes, None, None]:
       - 4字节（小端序）：音频数据的长度
       - 音频二进制数据（WAV 格式）
 
-    GPT-SoVITS 引擎不切句，整段发送让它自己内部切分，避免多次请求开销。
+    GPT-SoVITS 引擎也按句切分，让用户更快听到第一句话。
     """
-    # GPT-SoVITS 整段发送，不切句（它内部有 how_to_cut 参数控制切分）
-    if payload.engine == "gptsovits":
-        sentences = [payload.text]
-    else:
-        sentences = split_sentences(payload.text)
+    # 切分句子（所有引擎都切句，让用户更快听到第一句话）
+    sentences = split_sentences(payload.text)
 
     total = len(sentences)
 
