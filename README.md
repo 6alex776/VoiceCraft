@@ -52,7 +52,7 @@ ollama pull qwen3.5-4b-clean
 ollama serve
 ```
 
-> 模型名可在 `.env` 文件中修改。
+> 真实模型名在 `.env.example` 文件中修改。
 
 ### 2. 启动 GPT-SoVITS（可选，用于高级音色）
 
@@ -97,8 +97,8 @@ npm run dev
 
 1. 打开网页后，点击右上角 **三点菜单** → **音色设置**
 2. 勾选 **"使用 GPT-SoVITS 高级音色"**
-3. 参考音频路径填写：`C:\Users\29390\OneDrive\Desktop\project\GPT-SoVITS-v2pro-20250604\参考\みんなに届いたなら嬉しい.wav`,`C:\Users\29390\OneDrive\Desktop\project\GPT-SoVITS-v2pro-20250604\参考\这么多式样、这么多质地、这么多选择…啊，这就是「消费」呀，真是令人难以抵御的魅力.wav`
-4. 参考音频文本填写：`みんなに届いたなら嬉しい`，`这么多式样、这么多质地、这么多选择…啊，这就是「消费」呀，真是令人难以抵御的魅力`
+3. 参考音频路径填写：`C:\Users\29390\OneDrive\Desktop\project\GPT-SoVITS-v2pro-20250604\参考\みんなに届いたなら嬉しい.wav`或`C:\Users\29390\OneDrive\Desktop\project\GPT-SoVITS-v2pro-20250604\参考\这么多式样、这么多质地、这么多选择…啊，这就是「消费」呀，真是令人难以抵御的魅力.wav`
+4. 参考音频文本填写：`みんなに届いたなら嬉しい`或`这么多式样、这么多质地、这么多选择…啊，这就是「消费」呀，真是令人难以抵御的魅力`
 5. 开始对话
 
 ## 环境变量
