@@ -6,7 +6,7 @@
 
 | 组件 | 技术栈 | 端口 |
 |------|--------|------|
-| 前端 | Next.js 15 / React 19 | 3001 |
+| 前端 | Next.js 15 / React 19 | 3000（默认），若被占用则为 3001 |
 | 语音后端 | FastAPI + faster-whisper | 8001 |
 | LLM | Ollama | 11434 |
 | 高级 TTS | GPT-SoVITS（可选） | 9880 |
@@ -19,19 +19,40 @@
 
 ## 本地启动
 
-需要按顺序启动以下服务，每个服务占一个终端窗口。
+### 0. 安装依赖
+
+**前端依赖**
+
+```cmd
+cd C:\Users\29390\OneDrive\Desktop\project\VoiceCraft
+npm install
+```
+
+**后端依赖**
+
+```cmd
+cd services/voice-backend
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+```
+
+> 在 Windows 上 `pyttsx3` 用于 TTS 回退，但兼容性一般；建议优先配置 Piper 或 GPT-SoVITS。
 
 ### 1. 启动 Ollama
 
-```cmd
-ollama serve
-```
-
-确保 Ollama 已安装并运行，拉取模型（按你本地实际模型名调整）：
+确保 Ollama 已安装并运行，然后拉取模型：
 
 ```bash
 ollama pull qwen3.5-4b-clean
 ```
+
+启动服务：
+
+```bash
+ollama serve
+```
+
+> 模型名可在 `.env` 文件中修改。
 
 ### 2. 启动 GPT-SoVITS（可选，用于高级音色）
 
@@ -70,7 +91,7 @@ npm install
 npm run dev
 ```
 
-启动后打开浏览器访问终端显示的地址（默认 `http://localhost:3001`）。
+启动后打开浏览器访问终端显示的地址（默认 `http://localhost:3000`，若 3000 被占用则可能是 `http://localhost:3001`）。
 
 ### 5. 前端配置 GPT-SoVITS 音色
 
@@ -98,7 +119,8 @@ npm run dev
 
 ## 适合 RTX 4060 的建议
 
-- 先用 `7B/8B` 级中文指令模型
-- `faster-whisper small` 是更稳的起点
-- TTS 先用单一音色跑通，再考虑多音色
-- 如果显存只有 `8GB`，尽量别同时开太大的上下文和多个并发
+- LLM 用 `qwen3.5-4b-clean`，4B 参数在 8GB 显存上速度更快
+- ASR 用 `faster-whisper base`，中文日常对话够用
+- TTS 先用 Piper 或单一 GPT-SoVITS 音色跑通，再考虑多音色
+- GPT-SoVITS 与 Ollama 同时运行时容易爆显存，建议 GPT-SoVITS 用 `--device cpu` 启动
+- 如果显存只有 `8GB`，尽量别开太大的上下文长度和并发
