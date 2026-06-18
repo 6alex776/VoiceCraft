@@ -25,11 +25,12 @@ Windows 用户可直接使用一键启动脚本：
 # 首次运行前设置执行策略（只需一次）
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
+启动前请编辑 `start.ps1` 顶部的 GPT-SoVITS 路径和模型配置。若不想启动 GPT-SoVITS，将 `$GptSoVitsRoot` 设为空字符串即可。
+
 # 启动所有服务
 .\start.ps1
 ```
 
-启动前请编辑 `start.ps1` 顶部的 GPT-SoVITS 路径和模型配置。若不想启动 GPT-SoVITS，将 `$GptSoVitsRoot` 设为空字符串即可。
 
 ## 本地启动
 
